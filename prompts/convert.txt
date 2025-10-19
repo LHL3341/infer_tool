@@ -1,0 +1,2 @@
+Convert the following pure-text question into a multimodal question: {instruction}
+Enclose your reasoning and the rewritten question within <convert>...</convert> tags, and generate the TikZ code for the diagram within <tikz_code>...</tikz_code> tags.

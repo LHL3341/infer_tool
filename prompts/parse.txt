@@ -1,0 +1,2 @@
+{{<|image_pad|>}}
+Generate precise, well-structured TikZ code to faithfully recreate the image for LaTeX.

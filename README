@@ -1,0 +1,18 @@
+project/
+│
+├─ main.py          # 主推理脚本
+├─ utils.py                # 包含 load_remaining_records() 函数
+├─ batch_infer.sh                # 启动脚本（日志保存）
+│
+├─ prompts/
+│   ├─ synthesis.txt
+│   ├─ multimodal.txt
+│   └─ evaluation.txt
+│
+├─ data/
+│   ├─ input.jsonl
+│   └─ output.jsonl
+│
+└─ logs/
+    ├─ multimodal_20251016_143201.log
+    └─ synthesis_20251016_145812.log

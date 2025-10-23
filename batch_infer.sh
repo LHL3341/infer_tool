@@ -24,7 +24,7 @@ trap cleanup EXIT INT TERM
 MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
 QUOTA_TYPE="auto"
 PROMPT_NAME="vqa"
-MODEL_NAME="qwen2_5_vl"
+MODEL_NAME="qwen2_5vl"
 PROMPT_DIR="prompts"
 PARTS=4
 GPUS=1

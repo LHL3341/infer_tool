@@ -112,16 +112,30 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                 text = build_prompt(render_prompt(prompt_template, r), args.model_name)
                 img = None
                 if uses_image:
+                    candidate = None
                     if "image" in r and r["image"] is not None:
-                        img = r["image"]
+                        candidate = r["image"][0] if isinstance(r["image"], list) and len(r["image"]) > 0 else r["image"]
                     elif "images" in r and r["images"] is not None:
-                        img = r["images"][0]
-                    else:
-                        img_path = Path(r["image_path"])
+                        candidate = r["images"][0] if isinstance(r["images"], list) and len(r["images"]) > 0 else r["images"]
+                    elif "image_path" in r and r["image_path"] is not None:
+                        candidate = r["image_path"][0] if isinstance(r["image_path"], list) and len(r["image_path"]) > 0 else r["image_path"]
+                    elif "image_paths" in r and r["image_paths"] is not None:
+                        candidate = r["image_paths"][0] if isinstance(r["image_paths"], list) and len(r["image_paths"]) > 0 else r["image_paths"]
+
+                    if isinstance(candidate, Image.Image):
+                        img = candidate
+                    elif isinstance(candidate, (str, Path)):
+                        img_path = Path(candidate)
                         if not img_path.exists():
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
+                    elif candidate is None:
+                        print("⚠️ 记录缺少可用的图像字段，跳过")
+                        continue
+                    else:
+                        print(f"⚠️ 不支持的图像字段类型: {type(candidate)}，跳过")
+                        continue
                 prompts.append(text)
                 images.append(img)
                 valid_records.append(r)
@@ -180,21 +194,18 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
             # ✅ 确定 ID：如果原始数据有 id 就沿用，否则用递增的 processed 计数
             record_id = record.get("id", processed)
 
-            if "image" in record or "images" in record:
-                if 'images' in record:
-                    img = record["images"][0]
-                else:
-                    img = record["image"]
-
-                try:
-                    img_path = (output_image_dir / f"{record_id:06d}.png").resolve()  # ✅ 用 record_id 命名
-                    img.save(img_path, format="PNG")
-                    record["image_path"] = str(img_path)
-                except Exception as e:
-                    print(f"⚠️ 保存图片失败 (ID={record_id}): {e}")
-
-                record.pop("image", None)
-                record.pop("images", None)
+            if output_image_dir is not None and uses_image:
+                img_obj = images[idx] if idx < len(images) else None
+                if isinstance(img_obj, Image.Image):
+                    try:
+                        img_path = (output_image_dir / f"{record_id:06d}.png").resolve()
+                        img_obj.save(img_path, format="PNG")
+                        record["image_path"] = str(img_path)
+                    except Exception as e:
+                        print(f"⚠️ 保存图片失败 (ID={record_id}): {e}")
+            # 清理可能存在的原始图像字段，避免冗余
+            record.pop("image", None)
+            record.pop("images", None)
 
             # ✅ 输出记录时显式写入 id
             out_record = {

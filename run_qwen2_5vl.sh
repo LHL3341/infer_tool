@@ -8,17 +8,25 @@
 #     --output_jsonl data/output.jsonl \
 #     --prompt_name multimodal
 # ==========================================================
-source activate vlmeval
-cd /mnt/dhwfile/raise/user/linhonglin/data_process/infer_tool
+# source activate vlmeval
+source activate llamafactory
+# cd /mnt/dhwfile/raise/user/linhonglin/data_process/infer_tool
+cd /mnt/petrelfs/qinchonghan/project/infer_tool
 export VLLM_USE_V1=0
-GPUS=4
+GPUS=1
+# PARTITION="belt_road"
+PARTITION="raise"
+
 # 1️⃣ 解析参数
-# MODEL_PATH="Qwen/Qwen3-VL-8B-Instruct"
-MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
-INPUT_JSONL="/mnt/dhwfile/raise/user/linhonglin/vlm/stages/vqa_data/megascience_52k_vqa_withans.jsonl"
-OUTPUT_JSONL="/mnt/dhwfile/raise/user/linhonglin/vlm/stages/vqa_data/megascience_52k_vqa_qwen2_5vl_output.jsonl"
-PROMPT_NAME="qwen2_5_vl"
-MODEL_NAME="qwen2_5_vl"
+# MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
+MODEL_PATH="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/model/qwen2_5vl_7b_megascience_52k_datikz_v3/full/sft"
+
+INPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data/MMMU/test/annotations_abs.jsonl"
+# INPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data/Euclid30K/validation/annotations_abs.jsonl"
+OUTPUT_JSONL="/mnt/petrelfs/qinchonghan/project/LLaMA-Factory/inference/results/qwen2_5vl_7b_megascience_52k_datikz_v3_mmmu_test.jsonl"
+# OUTPUT_JSONL="/mnt/petrelfs/qinchonghan/project/LLaMA-Factory/inference/results/qwen2_5vl_7b_megascience_52k_datikz_v3_euclid30k.jsonl"
+PROMPT_NAME="parse"
+MODEL_NAME="qwen2_5vl"
 PROMPT_DIR="prompts"
 TEMPERATURE=0.1
 TOP_P=0.95
@@ -66,7 +74,7 @@ echo "🧾 日志: ${LOG_FILE}"
 echo "--------------------------------------------"
 
 # 5️⃣ 运行主程序并记录日志
-srun -p belt_road --gres=gpu:${GPUS} python main.py \
+srun -p $PARTITION --gres=gpu:${GPUS} python main.py \
   --model_path "$MODEL_PATH" \
   --input_jsonl "$INPUT_JSONL" \
   --output_jsonl "$OUTPUT_JSONL" \

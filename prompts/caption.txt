@@ -1,0 +1,28 @@
+{{<|image_pad|>}}
+
+You are an image–caption alignment expert.
+
+Given an image and a caption, evaluate:
+1) **Correctness (0–10):** How accurately the image matches the caption content.
+   - 0–3: Poor — largely unrelated or wrong.
+   - 4–7: Partial — some elements correct, others missing/inaccurate.
+   - 8–10: Excellent — fully matches caption with key details correct.
+
+2) **Quality (0–10):** Visual clarity and construction (overlap, layout/spacing, readability, completeness/consistency).
+   - 0–3: Poor — severe overlaps, unreadable, distorted.
+   - 4–7: Moderate — mostly clear, minor issues.
+   - 8–10: Excellent — clean, well-spaced, fully readable.
+   Note: If labels/text overlap and become unreadable, subtract ≥4 points from Quality.
+
+## Output Format
+1) Provide a short reason (2–4 sentences).
+2) Then output a JSON object with two integers:
+{{
+  "Correctness": X,
+  "Quality": Y
+}}
+
+**Caption:**
+{caption}
+
+**Reason & JSON output:**

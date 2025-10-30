@@ -3,6 +3,7 @@ from pathlib import Path
 from itertools import islice
 import torch
 import argparse
+import re
 from PIL import Image
 from utils import load_remaining_records, load_image
 from models import *
@@ -198,7 +199,15 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                 img_obj = images[idx] if idx < len(images) else None
                 if isinstance(img_obj, Image.Image):
                     try:
-                        img_path = (output_image_dir / f"{record_id:06d}.png").resolve()
+                        # Build a safe filename from record_id: zero-pad if numeric, sanitize if string
+                        filename: str
+                        try:
+                            record_id_int = int(record_id)
+                            filename = f"{record_id_int:06d}.png"
+                        except Exception:
+                            safe_id = re.sub(r'[^A-Za-z0-9._-]+', '_', str(record_id))[:64]
+                            filename = f"{safe_id}.png"
+                        img_path = (output_image_dir / filename).resolve()
                         img_obj.save(img_path, format="PNG")
                         record["image_path"] = str(img_path)
                     except Exception as e:

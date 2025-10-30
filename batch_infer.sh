@@ -8,17 +8,19 @@
 #   4️⃣ 所有任务完成后合并结果。
 # ==========================================================
 
-source activate vlmeval
-cd /mnt/dhwfile/raise/user/linhonglin/data_process/infer_tool
+# source activate vlmeval
+source activate llamafactory
+# cd /mnt/dhwfile/raise/user/linhonglin/data_process/infer_tool
+cd /mnt/petrelfs/qinchonghan/project/infer_tool
 export VLLM_USE_V1=0
 
 # ========== 捕获退出信号 ==========
-cleanup() {
-  echo "⚠️ 捕获退出信号，正在终止所有子任务..."
-  pkill -P $$ 2>/dev/null
-  echo "🛑 所有子任务已中止。"
-}
-trap cleanup EXIT INT TERM
+# cleanup() {
+#   echo "⚠️ 捕获退出信号，正在终止所有子任务..."
+#   pkill -P $$ 2>/dev/null
+#   echo "🛑 所有子任务已中止。"
+# }
+# trap cleanup EXIT INT TERM
 
 # ========== 默认参数 ==========
 MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
@@ -92,7 +94,7 @@ echo "🗒️ 日志目录: $LOG_DIR"
 
 # ========== 获取输入长度 ==========
 echo "🔍 正在检查输入数据条数..."
-python - "$INPUT" > /tmp/input_len.txt <<'PYCODE'
+python - "$INPUT" > "${LOG_DIR}/input_len_${EXP_NAME}.txt" <<'PYCODE'
 import json
 from datasets import load_dataset
 from pathlib import Path
@@ -111,7 +113,7 @@ except Exception as e:
     print(-1)
 PYCODE
 
-TOTAL=$(cat /tmp/input_len.txt)
+TOTAL=$(cat "${LOG_DIR}/input_len_${EXP_NAME}.txt")
 if [[ "$TOTAL" -le 0 ]]; then
   echo "❌ 无法确定输入长度或输入为空 (INPUT=$INPUT)."
   exit 1
@@ -163,7 +165,14 @@ for ((i=0; i<PARTS; i++)); do
     CMD="$CMD --save_images"   # 🆕 自动追加参数
   fi
 
-  srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  # srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  srun -p "$PARTITION" \
+     --ntasks=1 \
+     --cpus-per-task=4 \
+     --gres=gpu:${GPUS} \
+     --quotatype=$QUOTA_TYPE \
+     --exclusive \
+     bash -c "$CMD" > "$LOG_FILE" 2>&1 &
 done
 
 echo "⏳ 所有任务已提交，等待完成..."

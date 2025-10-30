@@ -65,11 +65,12 @@ if args.backend == "vllm":
 
     llm = LLM(
         model=args.model_path,
-        max_model_len=args.max_tokens + 2048,
+        # max_model_len=args.max_tokens + 2048,
         data_parallel_size=torch.cuda.device_count(),
         mm_processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 1024 * 1024},
-        enforce_eager=False,
+        # enforce_eager=False,
         disable_log_stats=True,
+        trust_remote_code=True,
     )
     sampling_params = SamplingParams(
         n=args.n_sample,
@@ -88,6 +89,7 @@ else:
     if uses_image:
         processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=True)
 
+print(f"🚀 模型加载完成，开始推理")
 # ========== 工具 ==========
 def render_prompt(template: str, fields: dict) -> str:
     return template.format(**fields)
@@ -104,6 +106,7 @@ def chunked_iterable(iterable, size):
 total = len(remaining_records)
 processed = 0
 
+print(f"🚀 开始推理，共 {total} 条记录")
 with output_jsonl.open("a", encoding="utf-8") as fout:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, valid_records = [], [], []
@@ -168,12 +171,24 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                     max_new_tokens=args.max_tokens,
                 )
 
-            # 解码并 reshape
+            # # 解码并 reshape
+            # for i in range(batch_size):
+            #     gen_texts = [
+            #         tokenizer.decode(outputs[i * args.n_sample + j], skip_special_tokens=True)
+            #         for j in range(args.n_sample)
+            #     ]
+            #     generations.append(gen_texts)
+            input_ids = inputs["input_ids"]
+
             for i in range(batch_size):
-                gen_texts = [
-                    tokenizer.decode(outputs[i * args.n_sample + j], skip_special_tokens=True)
-                    for j in range(args.n_sample)
-                ]
+                prompt_len = input_ids[i].shape[0]  # 当前样本的输入长度
+                gen_texts = []
+                for j in range(args.n_sample):
+                    output_ids = outputs[i * args.n_sample + j]
+                    # 去掉 prompt 部分的 token
+                    gen_part = output_ids[prompt_len:]
+                    decoded = tokenizer.decode(gen_part, skip_special_tokens=True).strip()
+                    gen_texts.append(decoded)
                 generations.append(gen_texts)
 
         for idx, (record, gen_texts) in enumerate(zip(valid_records, generations)):

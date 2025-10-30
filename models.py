@@ -13,7 +13,7 @@ def qwen25_vl_prompt(prompt):
     return text
 
 def qwen3_nothink_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-VL-8B-Instruct", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True)
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(
         messages,
@@ -24,7 +24,7 @@ def qwen3_nothink_prompt(prompt):
     return text
 
 def qwen3_think_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-VL-8B-Instruct", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True)
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(
         messages,
@@ -42,8 +42,22 @@ def qwen3_vl_nothink_prompt(prompt):
     text = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False
+    )
+    return text
+
+def intern_vl_prompt(prompt):
+    tokenizer = AutoTokenizer.from_pretrained("internlm/InternVL2-8B", trust_remote_code=True)
+    if '<image>' in prompt:
+        prompt = prompt.replace('<image>', '')
+    messages = [{"role": "user", "content": prompt.replace("{<|image_pad|>}", "<image>\n")}]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
         add_generation_prompt=True
     )
+    print(text)
     return text
 
 MODEL_CLASS = {
@@ -57,6 +71,7 @@ PROMPT_CLASS = {
     "qwen3_nothink": qwen3_nothink_prompt,
     "qwen3_think": qwen3_think_prompt,
     "qwen3vl_nothink": qwen3_vl_nothink_prompt,
+    "intern_vl": intern_vl_prompt,
 }
 
 def get_model(model_name):

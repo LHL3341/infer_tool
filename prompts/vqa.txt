@@ -1,2 +1,5 @@
 {{<|image_pad|>}}
+You are an expert in visual reasoning.
+Question:
 {converted_question}
+Extracting information from multimodal inputs and producing rigorous, step-by-step solutions.

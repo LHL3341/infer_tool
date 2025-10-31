@@ -30,7 +30,8 @@ MODEL_NAME="qwen2_5vl"
 PROMPT_DIR="prompts"
 PARTS=4
 GPUS=1
-PARTITION="belt_road"
+PARTITION="raise"
+# PARTITION="belt_road"
 TEMPERATURE=0.0
 TOP_P=0.95
 MAX_TOKENS=4096
@@ -128,6 +129,8 @@ echo "🔪 每个任务分配约 $PER_PART 条样本"
 # ========== 启动任务 ==========
 echo "🚀 启动推理任务..."
 
+NUM_GPUS=8
+
 for ((i=0; i<PARTS; i++)); do
   START_IDX=$(( i * PER_PART ))
   END_IDX=$(( (i + 1) * PER_PART ))
@@ -166,13 +169,14 @@ for ((i=0; i<PARTS; i++)); do
   fi
 
   # srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
-  srun -p "$PARTITION" \
-     --ntasks=1 \
-     --cpus-per-task=4 \
-     --gres=gpu:${GPUS} \
-     --quotatype=$QUOTA_TYPE \
-     --exclusive \
-     bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  # srun -p "$PARTITION" \
+  #    --ntasks=1 \
+  #    --cpus-per-task=4 \
+  #    --gres=gpu:${GPUS} \
+  #    --quotatype=$QUOTA_TYPE \
+  #    --exclusive \
+  #    bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  bash -c "$CMD" > "$LOG_FILE" 2>&1 &
 done
 
 echo "⏳ 所有任务已提交，等待完成..."

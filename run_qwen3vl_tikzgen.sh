@@ -16,11 +16,11 @@ PARTITION="belt_road"
 GPUS=1
 # 1️⃣ 解析参数
 # MODEL_PATH="Qwen/Qwen3-VL-8B-Instruct"
-MODEL_PATH="/mnt/dhwfile/raise/user/qinchonghan/models/Qwen3-VL-8B-Instruct"
-# MODEL_PATH="/mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3vl_tikzgen_score"
+# MODEL_PATH="/mnt/dhwfile/raise/user/qinchonghan/models/Qwen3-VL-8B-Instruct"
+MODEL_PATH="/mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3vl_tikzgen_score"
 # MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
 INPUT_JSONL="/mnt/dhwfile/raise/user/linhonglin/data_process/api_tool/outputs/qwen3_tikzgen/results_merged/success_merged.jsonl"
-OUTPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3vl_success_merged.jsonl"
+OUTPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3vl_success_merged_think.jsonl"
 PROMPT_NAME="scorer"
 MODEL_NAME="qwen3vl_nothink"
 PROMPT_DIR="prompts"
@@ -28,7 +28,7 @@ TEMPERATURE=0.1
 TOP_P=0.95
 MAX_TOKENS=4096
 N=1
-CHUNK_SIZE=128
+CHUNK_SIZE=1
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in

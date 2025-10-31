@@ -3,7 +3,6 @@ from pathlib import Path
 from itertools import islice
 import torch
 import argparse
-import re
 from PIL import Image
 from utils import load_remaining_records, load_image
 from models import *
@@ -66,11 +65,12 @@ if args.backend == "vllm":
 
     llm = LLM(
         model=args.model_path,
-        max_model_len=args.max_tokens + 2048,
+        # max_model_len=args.max_tokens + 2048,
         data_parallel_size=torch.cuda.device_count(),
         mm_processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 1024 * 1024},
-        enforce_eager=False,
+        # enforce_eager=False,
         disable_log_stats=True,
+        trust_remote_code=True,
     )
     sampling_params = SamplingParams(
         n=args.n_sample,
@@ -89,6 +89,7 @@ else:
     if uses_image:
         processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=True)
 
+print(f"🚀 模型加载完成，开始推理")
 # ========== 工具 ==========
 def render_prompt(template: str, fields: dict) -> str:
     return template.format(**fields)
@@ -105,6 +106,7 @@ def chunked_iterable(iterable, size):
 total = len(remaining_records)
 processed = 0
 
+print(f"🚀 开始推理，共 {total} 条记录")
 with output_jsonl.open("a", encoding="utf-8") as fout:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, valid_records = [], [], []
@@ -113,30 +115,16 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                 text = build_prompt(render_prompt(prompt_template, r), args.model_name)
                 img = None
                 if uses_image:
-                    candidate = None
                     if "image" in r and r["image"] is not None:
-                        candidate = r["image"][0] if isinstance(r["image"], list) and len(r["image"]) > 0 else r["image"]
+                        img = r["image"]
                     elif "images" in r and r["images"] is not None:
-                        candidate = r["images"][0] if isinstance(r["images"], list) and len(r["images"]) > 0 else r["images"]
-                    elif "image_path" in r and r["image_path"] is not None:
-                        candidate = r["image_path"][0] if isinstance(r["image_path"], list) and len(r["image_path"]) > 0 else r["image_path"]
-                    elif "image_paths" in r and r["image_paths"] is not None:
-                        candidate = r["image_paths"][0] if isinstance(r["image_paths"], list) and len(r["image_paths"]) > 0 else r["image_paths"]
-
-                    if isinstance(candidate, Image.Image):
-                        img = candidate
-                    elif isinstance(candidate, (str, Path)):
-                        img_path = Path(candidate)
+                        img = r["images"][0]
+                    else:
+                        img_path = Path(r["image_path"])
                         if not img_path.exists():
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
-                    elif candidate is None:
-                        print("⚠️ 记录缺少可用的图像字段，跳过")
-                        continue
-                    else:
-                        print(f"⚠️ 不支持的图像字段类型: {type(candidate)}，跳过")
-                        continue
                 prompts.append(text)
                 images.append(img)
                 valid_records.append(r)
@@ -183,38 +171,46 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                     max_new_tokens=args.max_tokens,
                 )
 
-            # 解码并 reshape
+            # # 解码并 reshape
+            # for i in range(batch_size):
+            #     gen_texts = [
+            #         tokenizer.decode(outputs[i * args.n_sample + j], skip_special_tokens=True)
+            #         for j in range(args.n_sample)
+            #     ]
+            #     generations.append(gen_texts)
+            input_ids = inputs["input_ids"]
+
             for i in range(batch_size):
-                gen_texts = [
-                    tokenizer.decode(outputs[i * args.n_sample + j], skip_special_tokens=True)
-                    for j in range(args.n_sample)
-                ]
+                prompt_len = input_ids[i].shape[0]  # 当前样本的输入长度
+                gen_texts = []
+                for j in range(args.n_sample):
+                    output_ids = outputs[i * args.n_sample + j]
+                    # 去掉 prompt 部分的 token
+                    gen_part = output_ids[prompt_len:]
+                    decoded = tokenizer.decode(gen_part, skip_special_tokens=True).strip()
+                    gen_texts.append(decoded)
                 generations.append(gen_texts)
+
 
         for idx, (record, gen_texts) in enumerate(zip(valid_records, generations)):
             # ✅ 确定 ID：如果原始数据有 id 就沿用，否则用递增的 processed 计数
             record_id = record.get("id", processed)
 
-            if output_image_dir is not None and uses_image:
-                img_obj = images[idx] if idx < len(images) else None
-                if isinstance(img_obj, Image.Image):
-                    try:
-                        # Build a safe filename from record_id: zero-pad if numeric, sanitize if string
-                        filename: str
-                        try:
-                            record_id_int = int(record_id)
-                            filename = f"{record_id_int:06d}.png"
-                        except Exception:
-                            safe_id = re.sub(r'[^A-Za-z0-9._-]+', '_', str(record_id))[:64]
-                            filename = f"{safe_id}.png"
-                        img_path = (output_image_dir / filename).resolve()
-                        img_obj.save(img_path, format="PNG")
-                        record["image_path"] = str(img_path)
-                    except Exception as e:
-                        print(f"⚠️ 保存图片失败 (ID={record_id}): {e}")
-            # 清理可能存在的原始图像字段，避免冗余
-            record.pop("image", None)
-            record.pop("images", None)
+            if "image" in record or "images" in record:
+                if 'images' in record:
+                    img = record["images"][0]
+                else:
+                    img = record["image"]
+
+                try:
+                    img_path = (output_image_dir / f"{record_id:06d}.png").resolve()  # ✅ 用 record_id 命名
+                    img.save(img_path, format="PNG")
+                    record["image_path"] = str(img_path)
+                except Exception as e:
+                    print(f"⚠️ 保存图片失败 (ID={record_id}): {e}")
+
+                record.pop("image", None)
+                record.pop("images", None)
 
             # ✅ 输出记录时显式写入 id
             out_record = {

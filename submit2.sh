@@ -11,11 +11,8 @@
 
 set -euo pipefail
 
-# 1) 进入项目目录
 cd /mnt/petrelfs/qinchonghan/project/infer_tool
 
-# 2) 激活环境
 source activate llamafactory
 
-# 3) 真正跑你现在的脚本（注意：这里是“在 SLURM 里跑 bash”，所以不会因为你 ssh 断开而停）
 bash /mnt/petrelfs/qinchonghan/project/infer_tool/scorer_batch_qwen3vl_tikzgen2.sh

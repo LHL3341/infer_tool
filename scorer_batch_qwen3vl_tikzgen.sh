@@ -9,11 +9,11 @@ bash batch_infer.sh \
   --model_path /mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3vl_tikzgen_score \
   --prompt_name scorer \
   --model_name qwen3vl_nothink \
-  --parts 4 \
+  --parts 8 \
   --gpus 1 \
   --partition belt_road \
   --save_images \
-  --n_sample 3 \
+  --n_sample 1 \
   --chunk_size 1 \
   --temperature 0.1 \
   --backend hf

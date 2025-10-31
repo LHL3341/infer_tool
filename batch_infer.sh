@@ -129,7 +129,7 @@ echo "🔪 每个任务分配约 $PER_PART 条样本"
 # ========== 启动任务 ==========
 echo "🚀 启动推理任务..."
 
-NUM_GPUS=8
+NUM_GPUS=8   # 你这台机器实际有几张卡就写几张
 
 for ((i=0; i<PARTS; i++)); do
   START_IDX=$(( i * PER_PART ))
@@ -147,7 +147,9 @@ for ((i=0; i<PARTS; i++)); do
   echo "▶️ 启动任务 part_$i: [$START_IDX, $END_IDX)"
   echo "   日志: $LOG_FILE"
 
-  CMD="python main.py \
+  GPU_ID=$(( i % NUM_GPUS ))
+
+  CMD="CUDA_VISIBLE_DEVICES=${GPU_ID} python main.py \
       --model_path $MODEL_PATH \
       --input_jsonl $INPUT \
       --output_jsonl $OUT_FILE \
@@ -165,23 +167,17 @@ for ((i=0; i<PARTS; i++)); do
       "
 
   if [[ "$SAVE_IMAGES" == "true" ]]; then
-    CMD="$CMD --save_images"   # 🆕 自动追加参数
+    CMD="$CMD --save_images"
   fi
 
-  # srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
-  # srun -p "$PARTITION" \
-  #    --ntasks=1 \
-  #    --cpus-per-task=4 \
-  #    --gres=gpu:${GPUS} \
-  #    --quotatype=$QUOTA_TYPE \
-  #    --exclusive \
-  #    bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  # 不走 srun，直接起后台
   bash -c "$CMD" > "$LOG_FILE" 2>&1 &
 done
 
 echo "⏳ 所有任务已提交，等待完成..."
 wait
 echo "✅ 所有子任务执行完毕！"
+
 
 # ========== 合并输出 ==========
 MERGED_FILE="${OUTPUT_DIR}/merged.jsonl"

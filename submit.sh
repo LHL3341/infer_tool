@@ -2,6 +2,8 @@
 #SBATCH -J qwen3vl_tikzgen_score
 #SBATCH -p raise
 #SBATCH --quotatype=spot
+#SBATCH --gres=gpu:0
+#SBATCH --nodelist=SH-IDC1-10-140-37-94
 #SBATCH -N 1
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=4

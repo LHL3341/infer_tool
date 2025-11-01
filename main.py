@@ -24,11 +24,13 @@ parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "hf"
 parser.add_argument("--save_images", action="store_true")
 parser.add_argument("--start_idx", type=int, default=None)
 parser.add_argument("--end_idx", type=int, default=None)
+parser.add_argument("--skipped_jsonl", type=str, default=None, help="保存被跳过样本的 JSONL 文件路径")
 args = parser.parse_args()
 
 # ========== 通用准备 ==========
 input_jsonl = Path(args.input_jsonl)
 output_jsonl = Path(args.output_jsonl)
+skipped_jsonl = Path(args.skipped_jsonl) if args.skipped_jsonl else (output_jsonl.parent / f"{output_jsonl.stem}.skipped.jsonl")
 prompt_file = Path(args.prompt_dir) / f"{args.prompt_name}.txt"
 assert prompt_file.exists(), f"❌ 找不到模板文件: {prompt_file}"
 
@@ -52,6 +54,7 @@ if not remaining_records:
     exit(0)
 
 output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+skipped_jsonl.parent.mkdir(parents=True, exist_ok=True)
 output_image_dir = None
 if args.save_images:
     output_image_dir = output_jsonl.parent / "images"
@@ -105,9 +108,10 @@ def chunked_iterable(iterable, size):
 # ========== 主循环 ==========
 total = len(remaining_records)
 processed = 0
+skipped = 0
 
 print(f"🚀 开始推理，共 {total} 条记录")
-with output_jsonl.open("a", encoding="utf-8") as fout:
+with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", encoding="utf-8") as fskip:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, image_paths, valid_records = [], [], [], []
         for r in chunk:
@@ -125,6 +129,31 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
+
+                    # 纵横比检查：max(w/h, h/w) < 200
+                    try:
+                        width, height = img.size
+                        ratio = max(width / max(1, height), height / max(1, width))
+                    except Exception as e:
+                        ratio = None
+                    if ratio is not None and ratio >= 200:
+                        skip_record = {
+                            **r,
+                            "skip_reason": "aspect_ratio_too_large",
+                            "aspect_ratio": ratio,
+                        }
+                        # 尽量记录图片路径
+                        if "image_path" in r:
+                            skip_record["image_path"] = r["image_path"]
+                        else:
+                            try:
+                                skip_record["image_path"] = str(img_path)
+                            except Exception:
+                                pass
+                        fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
+                        fskip.flush()
+                        skipped += 1
+                        continue
                 prompts.append(text)
                 images.append(img)
                 image_paths.append(img_path)
@@ -231,3 +260,4 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
         print(f"✅ 已处理 {processed}/{total}")
 
 print(f"🎉 全部生成完成，结果写入：{output_jsonl}")
+print(f"🚫 已跳过 {skipped} 条记录，写入：{skipped_jsonl}")

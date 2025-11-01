@@ -4,7 +4,7 @@ set -euo pipefail
 cd /mnt/petrelfs/qinchonghan/project/infer_tool
 
 bash batch_infer.sh \
-  --input /mnt/dhwfile/raise/user/linhonglin/data_process/api_tool/outputs/qwen3_tikzgen2/results_merged/success_merged.jsonl \
+  --input /mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3_tikzgen2_tmp/pending_pending_pending.jsonl \
   --output_dir /mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3_tikzgen2 \
   --model_path /mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3vl_tikzgen_score \
   --prompt_name scorer \
@@ -14,6 +14,6 @@ bash batch_infer.sh \
   --partition raise \
   --save_images \
   --n_sample 1 \
-  --chunk_size 1 \
+  --chunk_size 8 \
   --temperature 0.1 \
   --backend hf

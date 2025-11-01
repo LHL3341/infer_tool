@@ -11,24 +11,24 @@
 source activate llamafactory
 cd /mnt/petrelfs/qinchonghan/project/infer_tool
 export VLLM_USE_V1=0
-PARTITION="belt_road"
-# PARTITION="raise"
+# PARTITION="belt_road"
+PARTITION="raise"
 GPUS=1
 # 1️⃣ 解析参数
 # MODEL_PATH="Qwen/Qwen3-VL-8B-Instruct"
 # MODEL_PATH="/mnt/dhwfile/raise/user/qinchonghan/models/Qwen3-VL-8B-Instruct"
 MODEL_PATH="/mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3vl_tikzgen_score"
 # MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
-INPUT_JSONL="/mnt/dhwfile/raise/user/linhonglin/data_process/api_tool/outputs/qwen3_tikzgen/results_merged/success_merged.jsonl"
-OUTPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3vl_success_merged_think.jsonl"
+INPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3_tikzgen_tmp/pending_pending_pending_pending.jsonl"
+OUTPUT_JSONL="/mnt/dhwfile/raise/user/qinchonghan/llamafactory/data_selection/qwen3_tikzgen_tmp/pending_pending_pending_pending_finished.jsonl"
 PROMPT_NAME="scorer"
 MODEL_NAME="qwen3vl_nothink"
 PROMPT_DIR="prompts"
 TEMPERATURE=0.1
 TOP_P=0.95
-MAX_TOKENS=4096
+MAX_TOKENS=2048
 N=1
-CHUNK_SIZE=1
+CHUNK_SIZE=8
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in

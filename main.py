@@ -154,7 +154,7 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
             generations = []
             if uses_image:
                 processor.tokenizer.padding_side = 'left'
-                input_messages = [[{"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"file://{image_path}"}}, {"type": "text", "text": prompt}]}] for prompt, image_path in zip(prompts, image_paths)]
+                input_messages = [[{"role": "user", "content": [{"type": "image", "image": str(image_path)}, {"type": "text", "text": prompt.replace("{<|image_pad|>}", "")}]}] for prompt, image_path in zip(prompts, image_paths)]
             else:
                 processor.tokenizer.padding_side = 'left'
                 input_messages = [[{"role": "user", "content": prompt}] for prompt in prompts]
@@ -170,8 +170,6 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                     return_tensors="pt",
                     padding=True # padding should be set for batch generation!
                 ).to(model.device)
-                # print(inputs)
-                # print(inputs.input_ids.shape)
 
                 generated_ids = model.generate(
                     **inputs,

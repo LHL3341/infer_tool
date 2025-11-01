@@ -72,13 +72,15 @@ fi
 # ========== 输出目录 ==========
 BASENAME=$(basename "$INPUT")
 EXP_NAME="${BASENAME%.*}"   # 去掉扩展名，比如 dev.jsonl -> dev
+MODEL_PATH_NAME=$(basename "$MODEL_PATH")
+MODEL_PATH_NAME=${MODEL_PATH_NAME%.*}
 
 # 输出目录直接放在 outputs/ 下一级
 OUTPUT_ROOT="${OUTPUT_DIR:-outputs}"   # 一级 outputs
 LOG_ROOT="logs"
 
 # 实验子目录
-EXP_TAG="${EXP_NAME}-${MODEL_NAME}-${PROMPT_NAME}"
+EXP_TAG="${EXP_NAME}-${MODEL_NAME}-${PROMPT_NAME}-${MODEL_PATH_NAME}"
 
 OUTPUT_DIR="${OUTPUT_ROOT}/${EXP_TAG}"  # e.g. outputs/dev-qwen2_5vl-parse
 LOG_DIR="${LOG_ROOT}/${EXP_TAG}"

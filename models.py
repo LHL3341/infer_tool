@@ -45,7 +45,7 @@ def qwen3_vl_nothink_prompt(prompt):
         add_generation_prompt=True,
     )
     text += "<think>\n\n</think>\n\n"
-    print(text)
+    # print(text)
     return text
 
 def intern_vl_prompt(prompt):
@@ -58,7 +58,7 @@ def intern_vl_prompt(prompt):
         tokenize=False,
         add_generation_prompt=True
     )
-    print(text)
+    # print(text)
     return text
 
 MODEL_CLASS = {

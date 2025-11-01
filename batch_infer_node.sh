@@ -98,7 +98,7 @@ echo "🗒️ 日志目录: $LOG_DIR"
 
 # ========== 获取输入长度 ==========
 echo "🔍 正在检查输入数据条数..."
-python - "$INPUT" > "${LOG_DIR}/input_len_${EXP_NAME}.txt" <<'PYCODE'
+python - "$INPUT" > $LOG_DIR/input_len.txt <<'PYCODE'
 import json
 from datasets import load_dataset
 from pathlib import Path
@@ -117,7 +117,7 @@ except Exception as e:
     print(-1)
 PYCODE
 
-TOTAL=$(cat "${LOG_DIR}/input_len_${EXP_NAME}.txt")
+TOTAL=$(cat $LOG_DIR/input_len.txt)
 if [[ "$TOTAL" -le 0 ]]; then
   echo "❌ 无法确定输入长度或输入为空 (INPUT=$INPUT)."
   exit 1
@@ -180,7 +180,6 @@ done
 echo "⏳ 所有任务已提交，等待完成..."
 wait
 echo "✅ 所有子任务执行完毕！"
-
 
 # ========== 合并输出 ==========
 MERGED_FILE="${OUTPUT_DIR}/merged.jsonl"

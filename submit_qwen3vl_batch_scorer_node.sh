@@ -17,4 +17,4 @@ cd /mnt/petrelfs/qinchonghan/project/infer_tool
 
 source activate llamafactory
 
-bash /mnt/petrelfs/qinchonghan/project/infer_tool/scorer_batch_qwen3vl_tikzgen.sh
+bash /mnt/petrelfs/qinchonghan/project/infer_tool/run_qwen3vl_batch_scorer_node.sh

@@ -15,26 +15,25 @@ cd /mnt/petrelfs/qinchonghan/project/infer_tool
 export VLLM_USE_V1=0
 
 # ========== 捕获退出信号 ==========
-# cleanup() {
-#   echo "⚠️ 捕获退出信号，正在终止所有子任务..."
-#   pkill -P $$ 2>/dev/null
-#   echo "🛑 所有子任务已中止。"
-# }
-# trap cleanup EXIT INT TERM
+cleanup() {
+  echo "⚠️ 捕获退出信号，正在终止所有子任务..."
+  pkill -P $$ 2>/dev/null
+  echo "🛑 所有子任务已中止。"
+}
+trap cleanup EXIT INT TERM
 
 # ========== 默认参数 ==========
 MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
 QUOTA_TYPE="auto"
 PROMPT_NAME="vqa"
-MODEL_NAME="qwen2_5vl"
+MODEL_NAME="qwen2_5_vl"
 PROMPT_DIR="prompts"
-PARTS=4
+PARTS=8
 GPUS=1
-PARTITION="raise"
-# PARTITION="belt_road"
+PARTITION="belt_road"
 TEMPERATURE=0.0
 TOP_P=0.95
-MAX_TOKENS=4096
+MAX_TOKENS=2048
 N_SAMPLE=1
 CHUNK_SIZE=1
 SAVE_IMAGES=${SAVE_IMAGES:-false}  # 🆕 新增：是否保存图片（默认 false）
@@ -75,13 +74,15 @@ fi
 # ========== 输出目录 ==========
 BASENAME=$(basename "$INPUT")
 EXP_NAME="${BASENAME%.*}"   # 去掉扩展名，比如 dev.jsonl -> dev
+MODEL_PATH_NAME=$(basename "$MODEL_PATH")
+MODEL_PATH_NAME=${MODEL_PATH_NAME%.*}
 
 # 输出目录直接放在 outputs/ 下一级
 OUTPUT_ROOT="${OUTPUT_DIR:-outputs}"   # 一级 outputs
 LOG_ROOT="logs"
 
 # 实验子目录
-EXP_TAG="${EXP_NAME}-${MODEL_NAME}-${PROMPT_NAME}"
+EXP_TAG="${EXP_NAME}-${MODEL_NAME}-${PROMPT_NAME}-${MODEL_PATH_NAME}"
 
 OUTPUT_DIR="${OUTPUT_ROOT}/${EXP_TAG}"  # e.g. outputs/dev-qwen2_5vl-parse
 LOG_DIR="${LOG_ROOT}/${EXP_TAG}"
@@ -95,7 +96,7 @@ echo "🗒️ 日志目录: $LOG_DIR"
 
 # ========== 获取输入长度 ==========
 echo "🔍 正在检查输入数据条数..."
-python - "$INPUT" > "${LOG_DIR}/input_len_${EXP_NAME}.txt" <<'PYCODE'
+python - "$INPUT" > $LOG_DIR/input_len.txt <<'PYCODE'
 import json
 from datasets import load_dataset
 from pathlib import Path
@@ -114,7 +115,7 @@ except Exception as e:
     print(-1)
 PYCODE
 
-TOTAL=$(cat "${LOG_DIR}/input_len_${EXP_NAME}.txt")
+TOTAL=$(cat $LOG_DIR/input_len.txt)
 if [[ "$TOTAL" -le 0 ]]; then
   echo "❌ 无法确定输入长度或输入为空 (INPUT=$INPUT)."
   exit 1
@@ -128,8 +129,6 @@ echo "🔪 每个任务分配约 $PER_PART 条样本"
 
 # ========== 启动任务 ==========
 echo "🚀 启动推理任务..."
-
-NUM_GPUS=8   # 你这台机器实际有几张卡就写几张
 
 for ((i=0; i<PARTS; i++)); do
   START_IDX=$(( i * PER_PART ))
@@ -147,9 +146,7 @@ for ((i=0; i<PARTS; i++)); do
   echo "▶️ 启动任务 part_$i: [$START_IDX, $END_IDX)"
   echo "   日志: $LOG_FILE"
 
-  GPU_ID=$(( i % NUM_GPUS ))
-
-  CMD="CUDA_VISIBLE_DEVICES=${GPU_ID} python main.py \
+  CMD="python main.py \
       --model_path $MODEL_PATH \
       --input_jsonl $INPUT \
       --output_jsonl $OUT_FILE \
@@ -167,17 +164,22 @@ for ((i=0; i<PARTS; i++)); do
       "
 
   if [[ "$SAVE_IMAGES" == "true" ]]; then
-    CMD="$CMD --save_images"
+    CMD="$CMD --save_images"   # 🆕 自动追加参数
   fi
 
-  # 不走 srun，直接起后台
-  bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  # srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
+  srun -p "$PARTITION" \
+     --ntasks=1 \
+     --cpus-per-task=4 \
+     --gres=gpu:${GPUS} \
+     --quotatype=$QUOTA_TYPE \
+     --exclusive \
+     bash -c "$CMD" > "$LOG_FILE" 2>&1 &
 done
 
 echo "⏳ 所有任务已提交，等待完成..."
 wait
 echo "✅ 所有子任务执行完毕！"
-
 
 # ========== 合并输出 ==========
 MERGED_FILE="${OUTPUT_DIR}/merged.jsonl"

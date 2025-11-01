@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoModel, AutoProcessor,Qwen3VLForConditionalGeneration,Qwen2_5_VLForConditionalGeneration
 
 def qwen25_vl_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", trust_remote_code=True, padding_side="left")
     if '<image>' in prompt:
         prompt = prompt.replace('<image>', '')
     messages = [{"role": "user", "content": prompt.replace("{<|image_pad|>}", "<|vision_start|><|image_pad|><|vision_end|>")}]
@@ -13,7 +13,7 @@ def qwen25_vl_prompt(prompt):
     return text
 
 def qwen3_nothink_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True, padding_side="left")
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(
         messages,
@@ -24,7 +24,7 @@ def qwen3_nothink_prompt(prompt):
     return text
 
 def qwen3_think_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B-Instruct", trust_remote_code=True, padding_side="left")
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(
         messages,
@@ -35,7 +35,7 @@ def qwen3_think_prompt(prompt):
     return text
 
 def qwen3_vl_nothink_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-VL-8B-Instruct", trust_remote_code=True, padding_side='left')
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-VL-8B-Instruct", trust_remote_code=True, padding_side="left")
     if '<image>' in prompt:
         prompt = prompt.replace('<image>', '')
     messages = [{"role": "user", "content": prompt.replace("{<|image_pad|>}", "<|vision_start|><|image_pad|><|vision_end|>")}]
@@ -43,15 +43,13 @@ def qwen3_vl_nothink_prompt(prompt):
         messages,
         tokenize=False,
         add_generation_prompt=True,
-        enable_thinking=False
     )
     text += "<think>\n\n</think>\n\n"
-    print(text)
+    # print(text)
     return text
 
 def intern_vl_prompt(prompt):
-    text = text + "\n<think>\n</think>\n"
-    tokenizer = AutoTokenizer.from_pretrained("internlm/InternVL2-8B", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("internlm/InternVL2-8B", trust_remote_code=True, padding_side="left")
     if '<image>' in prompt:
         prompt = prompt.replace('<image>', '')
     messages = [{"role": "user", "content": prompt.replace("{<|image_pad|>}", "<image>\n")}]

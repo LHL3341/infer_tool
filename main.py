@@ -109,10 +109,10 @@ processed = 0
 print(f"🚀 开始推理，共 {total} 条记录")
 with output_jsonl.open("a", encoding="utf-8") as fout:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
-        prompts, images, valid_records = [], [], []
+        prompts, images, image_paths, valid_records = [], [], [], []
         for r in chunk:
             try:
-                text = build_prompt(render_prompt(prompt_template, r), args.model_name)
+                text = render_prompt(prompt_template, r)
                 img = None
                 if uses_image:
                     if "image" in r and r["image"] is not None:
@@ -127,6 +127,7 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                         img = load_image(img_path)
                 prompts.append(text)
                 images.append(img)
+                image_paths.append(img_path)
                 valid_records.append(r)
             except Exception as e:
                 print(f"⚠️ 构造 prompt 出错: {e}")
@@ -143,7 +144,7 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                     sampling_params=sampling_params
                 )
                 # 每条记录收集所有 n_sample 输出
-                generations = [[g.text.strip() for g in o.outputs] for o in outputs]
+                generations = [[build_prompt(g.text.strip(), args.model_name) for g in o.outputs] for o in outputs]
             except Exception as e:
                 print(f"❌ vLLM 生成失败: {e}")
                 continue
@@ -152,45 +153,49 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
             # HF 批量生成多采样
             generations = []
             if uses_image:
-                # 将 images 和文本一起处理成 batch 输入
-                inputs = processor(images=images, text=prompts, return_tensors="pt", padding=True).to("cuda")
+                processor.tokenizer.padding_side = 'left'
+                input_messages = [[{"role": "user", "content": [{"type": "image", "image": str(image_path)}, {"type": "text", "text": prompt.replace("{<|image_pad|>}", "")}]}] for prompt, image_path in zip(prompts, image_paths)]
             else:
-                # 纯文本 batch
-                inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
+                processor.tokenizer.padding_side = 'left'
+                input_messages = [[{"role": "user", "content": prompt}] for prompt in prompts]
 
-            # 扩展 batch，实现 n_sample
-            batch_size = inputs["input_ids"].shape[0]
-            expanded_inputs = {k: v.repeat_interleave(args.n_sample, dim=0) for k, v in inputs.items()}
+            input_messages = [msg for msg in input_messages for _ in range(args.n_sample)]
 
             with torch.no_grad():
-                outputs = model.generate(
-                    **expanded_inputs,
+                inputs = processor.apply_chat_template(
+                    input_messages,
+                    tokenize=True,
+                    add_generation_prompt=True,
+                    return_dict=True,
+                    return_tensors="pt",
+                    padding=True # padding should be set for batch generation!
+                ).to(model.device)
+
+                generated_ids = model.generate(
+                    **inputs,
                     do_sample=True,
                     temperature=args.temperature,
                     top_p=args.top_p,
                     max_new_tokens=args.max_tokens,
+                    # num_return_sequences=args.n_sample
                 )
 
-            # # 解码并 reshape
-            # for i in range(batch_size):
-            #     gen_texts = [
-            #         tokenizer.decode(outputs[i * args.n_sample + j], skip_special_tokens=True)
-            #         for j in range(args.n_sample)
-            #     ]
-            #     generations.append(gen_texts)
-            input_ids = inputs["input_ids"]
+            num_original = len(prompts)
+            # print(num_original)
+            # print(args.n_sample)
+            # print(generated_ids.shape)
+            for i in range(num_original):
+                start = i * args.n_sample
+                end = (i + 1) * args.n_sample
+                gen_ids_trimmed = [
+                    out_ids[len(inputs.input_ids[start]):] for j, out_ids in enumerate(generated_ids[start:end])
+                ]
+                output_texts = processor.batch_decode(
+                    gen_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                )
+                generations.append(output_texts)
 
-            for i in range(batch_size):
-                prompt_len = input_ids[i].shape[0]  # 当前样本的输入长度
-                gen_texts = []
-                for j in range(args.n_sample):
-                    output_ids = outputs[i * args.n_sample + j]
-                    # 去掉 prompt 部分的 token
-                    gen_part = output_ids[prompt_len:]
-                    decoded = tokenizer.decode(gen_part, skip_special_tokens=True).strip()
-                    gen_texts.append(decoded)
-                generations.append(gen_texts)
-
+            print(generations)
 
         for idx, (record, gen_texts) in enumerate(zip(valid_records, generations)):
             # ✅ 确定 ID：如果原始数据有 id 就沿用，否则用递增的 processed 计数
@@ -222,8 +227,6 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
             fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
             fout.flush()
             processed += 1
-
-
 
         print(f"✅ 已处理 {processed}/{total}")
 

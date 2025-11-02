@@ -5,7 +5,7 @@ bash batch_infer.sh \
   --model_path /mnt/dhwfile/raise/user/linhonglin/vlm/models/qwen3_tikzgen_webinstruct_50k \
   --prompt_name convert_megascience \
   --model_name qwen3_nothink \
-  --parts 8 \
+  --parts 12 \
   --gpus 1 \
   --temperature 0.6 \
   --n_sample 2 \

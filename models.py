@@ -13,7 +13,7 @@ def qwen25_vl_prompt(prompt):
     return text
 
 def qwen3_nothink_prompt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B", trust_remote_code=True, padding_side="left")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-VL-8B-Instruct", trust_remote_code=True, padding_side="left")
     messages = [{"role": "user", "content": prompt}]
     text = tokenizer.apply_chat_template(
         messages,
@@ -21,6 +21,7 @@ def qwen3_nothink_prompt(prompt):
         add_generation_prompt=True,
         enable_thinking=False
     )
+    # print(text)
     return text
 
 def qwen3_think_prompt(prompt):

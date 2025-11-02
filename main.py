@@ -24,13 +24,11 @@ parser.add_argument("--backend", type=str, default="vllm", choices=["vllm", "hf"
 parser.add_argument("--save_images", action="store_true")
 parser.add_argument("--start_idx", type=int, default=None)
 parser.add_argument("--end_idx", type=int, default=None)
-parser.add_argument("--skipped_jsonl", type=str, default=None, help="保存被跳过样本的 JSONL 文件路径")
 args = parser.parse_args()
 
 # ========== 通用准备 ==========
 input_jsonl = Path(args.input_jsonl)
 output_jsonl = Path(args.output_jsonl)
-skipped_jsonl = Path(args.skipped_jsonl) if args.skipped_jsonl else (output_jsonl.parent / f"{output_jsonl.stem}.skipped.jsonl")
 prompt_file = Path(args.prompt_dir) / f"{args.prompt_name}.txt"
 assert prompt_file.exists(), f"❌ 找不到模板文件: {prompt_file}"
 
@@ -54,7 +52,6 @@ if not remaining_records:
     exit(0)
 
 output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-skipped_jsonl.parent.mkdir(parents=True, exist_ok=True)
 output_image_dir = None
 if args.save_images:
     output_image_dir = output_jsonl.parent / "images"
@@ -69,11 +66,13 @@ if args.backend == "vllm":
     llm = LLM(
         model=args.model_path,
         # max_model_len=args.max_tokens + 2048,
+        gpu_memory_utilization=0.9,
+        enable_prefix_caching=True,
         data_parallel_size=torch.cuda.device_count(),
-        mm_processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 1024 * 1024},
         # enforce_eager=False,
         disable_log_stats=True,
         trust_remote_code=True,
+        mm_processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 1024 * 1024} if uses_image else None,
     )
     sampling_params = SamplingParams(
         n=args.n_sample,
@@ -85,7 +84,7 @@ if args.backend == "vllm":
 else:
     print("🧠 使用 HuggingFace Transformers 推理后端")
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
-    model = MODEL_CLASS[args.model_name].from_pretrained(
+    model = get_model(args.model_name).from_pretrained(
         args.model_path, trust_remote_code=True, dtype=torch.float16
     ).cuda()
     model.eval()
@@ -108,15 +107,15 @@ def chunked_iterable(iterable, size):
 # ========== 主循环 ==========
 total = len(remaining_records)
 processed = 0
-skipped = 0
 
 print(f"🚀 开始推理，共 {total} 条记录")
-with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", encoding="utf-8") as fskip:
+with output_jsonl.open("a", encoding="utf-8") as fout:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, image_paths, valid_records = [], [], [], []
         for r in chunk:
             try:
                 text = render_prompt(prompt_template, r)
+                prompts.append(text)
                 img = None
                 if uses_image:
                     if "image" in r and r["image"] is not None:
@@ -129,51 +128,26 @@ with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", e
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
-
-                    # 纵横比检查：max(w/h, h/w) < 200
-                    try:
-                        width, height = img.size
-                        ratio = max(width / max(1, height), height / max(1, width))
-                    except Exception as e:
-                        ratio = None
-                    if ratio is not None and ratio >= 200:
-                        skip_record = {
-                            **r,
-                            "skip_reason": "aspect_ratio_too_large",
-                            "aspect_ratio": ratio,
-                        }
-                        # 尽量记录图片路径
-                        if "image_path" in r:
-                            skip_record["image_path"] = r["image_path"]
-                        else:
-                            try:
-                                skip_record["image_path"] = str(img_path)
-                            except Exception:
-                                pass
-                        fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
-                        fskip.flush()
-                        skipped += 1
-                        continue
-                prompts.append(text)
+                    image_paths.append(img_path)
                 images.append(img)
-                image_paths.append(img_path)
                 valid_records.append(r)
             except Exception as e:
                 print(f"⚠️ 构造 prompt 出错: {e}")
                 continue
 
         if not prompts:
+            print(f"⚠️ 没有有效的 prompts")
             continue
 
         if args.backend == "vllm":
             try:
                 outputs = llm.generate(
-                    [{"prompt": t, "multi_modal_data": {"image": img} if uses_image else None}
+                    [{"prompt": build_prompt(t, args.model_name), "multi_modal_data": {"image": img} if uses_image else None}
                     for t, img in zip(prompts, images)],
                     sampling_params=sampling_params
                 )
                 # 每条记录收集所有 n_sample 输出
-                generations = [[build_prompt(g.text.strip(), args.model_name) for g in o.outputs] for o in outputs]
+                generations = [[g.text.strip() for g in o.outputs] for o in outputs]
             except Exception as e:
                 print(f"❌ vLLM 生成失败: {e}")
                 continue
@@ -224,7 +198,6 @@ with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", e
                 )
                 generations.append(output_texts)
 
-            print(generations)
 
         for idx, (record, gen_texts) in enumerate(zip(valid_records, generations)):
             # ✅ 确定 ID：如果原始数据有 id 就沿用，否则用递增的 processed 计数
@@ -260,4 +233,3 @@ with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", e
         print(f"✅ 已处理 {processed}/{total}")
 
 print(f"🎉 全部生成完成，结果写入：{output_jsonl}")
-print(f"🚫 已跳过 {skipped} 条记录，写入：{skipped_jsonl}")

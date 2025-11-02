@@ -10,4 +10,5 @@ bash batch_infer.sh \
   --temperature 0.6 \
   --n_sample 2 \
   --chunk_size 256 \
+  --max_tokens 3072 \
   --partition belt_road

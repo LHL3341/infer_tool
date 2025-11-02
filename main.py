@@ -65,11 +65,10 @@ if args.backend == "vllm":
 
     llm = LLM(
         model=args.model_path,
-        # max_model_len=args.max_tokens + 2048,
+        max_model_len=args.max_tokens + 2048,
         gpu_memory_utilization=0.9,
         enable_prefix_caching=True,
         data_parallel_size=torch.cuda.device_count(),
-        # enforce_eager=False,
         disable_log_stats=True,
         trust_remote_code=True,
         mm_processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 1024 * 1024} if uses_image else None,

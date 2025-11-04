@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from itertools import islice
 import torch
@@ -91,6 +92,21 @@ else:
         processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=True)
 
 print(f"🚀 模型加载完成，开始推理")
+# ========== 运行环境诊断 ==========
+try:
+    env_info = {
+        "SLURM_JOB_ID": os.environ.get("SLURM_JOB_ID"),
+        "SLURM_PROCID": os.environ.get("SLURM_PROCID"),
+        "SLURM_LOCALID": os.environ.get("SLURM_LOCALID"),
+        "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES"),
+    }
+    gpus = torch.cuda.device_count()
+    print(f"🧪 环境: {env_info}, torch_cuda_devices={gpus}")
+    if gpus > 0:
+        current = torch.cuda.current_device()
+        print(f"🧪 当前GPU: index={current}, name={torch.cuda.get_device_name(current)}")
+except Exception as _:
+    pass
 # ========== 工具 ==========
 def render_prompt(template: str, fields: dict) -> str:
     return template.format(**fields)
@@ -108,7 +124,9 @@ total = len(remaining_records)
 processed = 0
 
 print(f"🚀 开始推理，共 {total} 条记录")
-with output_jsonl.open("a", encoding="utf-8") as fout:
+# 跳过文件：以 skipped_ 作为前缀放在同目录
+skipped_jsonl = output_jsonl.with_name("skipped_" + output_jsonl.name)
+with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", encoding="utf-8") as fskip:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, image_paths, valid_records = [], [], [], []
         for r in chunk:
@@ -127,7 +145,42 @@ with output_jsonl.open("a", encoding="utf-8") as fout:
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
-                    image_paths.append(img_path)
+                        image_paths.append(img_path)
+                    # 计算并校验宽高比，超过则跳过并记录
+                    try:
+                        width, height = img.size
+                        if width <= 0 or height <= 0:
+                            raise ValueError("invalid image size")
+                        aspect_ratio = max(width / height, height / width)
+                        if aspect_ratio > 200:
+                            skip_record = {
+                                **{k: v for k, v in r.items() if k not in ("image", "images")},
+                                "skip_reason": "aspect_ratio_exceeded",
+                                "aspect_ratio": aspect_ratio,
+                                "prompt_name": args.prompt_name,
+                            }
+                            fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
+                            fskip.flush()
+                            # 本条记录跳过
+                            # 撤销此前 append 的 prompt
+                            prompts.pop()
+                            # 不把该图加入 images/valid_records
+                            # 若此前追加了 image_paths，也撤销
+                            if image_paths and ("image_path" in r):
+                                # 仅在通过路径分支追加过时回退一次
+                                image_paths.pop()
+                            continue
+                    except Exception as e:
+                        print(f"⚠️ 计算宽高比失败，跳过该图片: {e}")
+                        skip_record = {
+                            **{k: v for k, v in r.items() if k not in ("image", "images")},
+                            "skip_reason": "aspect_ratio_check_failed",
+                            "prompt_name": args.prompt_name,
+                        }
+                        fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
+                        fskip.flush()
+                        prompts.pop()
+                        continue
                 images.append(img)
                 valid_records.append(r)
             except Exception as e:

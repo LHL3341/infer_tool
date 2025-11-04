@@ -9,7 +9,8 @@ bash batch_infer.sh \
   --parts 4 \
   --gpus 1 \
   --temperature 0.1 \
-  --n_sample 3 \
-  --chunk_size 128 \
+  --n_sample 2 \
+  --chunk_size 8 \
   --max_tokens 1024 \
+  --backend hf \
   --partition belt_road

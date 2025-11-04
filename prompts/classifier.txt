@@ -1,5 +1,5 @@
 {{<|image_pad|>}}
 Based on the image and the following question, classify the image into one of the following categories:
 Mathematics, Science, Chemistry, Physics, Biology, Others.
-Return the category only, no other text.
+Only return the category, no other text.
 {converted_question}

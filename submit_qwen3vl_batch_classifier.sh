@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J qwen3vl_classifier
 #SBATCH -p belt_road
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 #SBATCH -N 1
-#SBATCH --ntasks=4
+#SBATCH --ntasks=8
 #SBATCH --cpus-per-task=4
 #SBATCH -o /mnt/petrelfs/qinchonghan/project/infer_tool/logs/qwen3vl_classifier_%j.out
 #SBATCH -e /mnt/petrelfs/qinchonghan/project/infer_tool/logs/qwen3vl_classifier_%j.err

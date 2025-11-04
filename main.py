@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from itertools import islice
 import torch
@@ -59,6 +58,9 @@ if args.save_images:
     output_image_dir.mkdir(parents=True, exist_ok=True)
     print(f"💾 图片保存已开启，将输出到: {output_image_dir}")
 
+# 记录跳过样本的文件（与输出同目录，命名为 skipped_同名文件）
+skipped_jsonl = output_jsonl.parent / ("skipped_" + output_jsonl.name)
+
 # ========== 根据 backend 初始化模型 ==========
 if args.backend == "vllm":
     from vllm import LLM, SamplingParams
@@ -92,21 +94,6 @@ else:
         processor = AutoProcessor.from_pretrained(args.model_path, trust_remote_code=True)
 
 print(f"🚀 模型加载完成，开始推理")
-# ========== 运行环境诊断 ==========
-try:
-    env_info = {
-        "SLURM_JOB_ID": os.environ.get("SLURM_JOB_ID"),
-        "SLURM_PROCID": os.environ.get("SLURM_PROCID"),
-        "SLURM_LOCALID": os.environ.get("SLURM_LOCALID"),
-        "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES"),
-    }
-    gpus = torch.cuda.device_count()
-    print(f"🧪 环境: {env_info}, torch_cuda_devices={gpus}")
-    if gpus > 0:
-        current = torch.cuda.current_device()
-        print(f"🧪 当前GPU: index={current}, name={torch.cuda.get_device_name(current)}")
-except Exception as _:
-    pass
 # ========== 工具 ==========
 def render_prompt(template: str, fields: dict) -> str:
     return template.format(**fields)
@@ -124,9 +111,7 @@ total = len(remaining_records)
 processed = 0
 
 print(f"🚀 开始推理，共 {total} 条记录")
-# 跳过文件：以 skipped_ 作为前缀放在同目录
-skipped_jsonl = output_jsonl.with_name("skipped_" + output_jsonl.name)
-with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", encoding="utf-8") as fskip:
+with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", encoding="utf-8") as skip_fout:
     for chunk in chunked_iterable(remaining_records, args.chunk_size):
         prompts, images, image_paths, valid_records = [], [], [], []
         for r in chunk:
@@ -145,42 +130,48 @@ with output_jsonl.open("a", encoding="utf-8") as fout, skipped_jsonl.open("a", e
                             print(f"⚠️ 图片不存在，跳过: {img_path}")
                             continue
                         img = load_image(img_path)
-                        image_paths.append(img_path)
-                    # 计算并校验宽高比，超过则跳过并记录
+                    # 计算并检查纵横比（absolute aspect ratio < 200）
                     try:
                         width, height = img.size
                         if width <= 0 or height <= 0:
                             raise ValueError("invalid image size")
-                        aspect_ratio = max(width / height, height / width)
-                        if aspect_ratio > 200:
+                        abs_ratio = max(width / height, height / width)
+                        if abs_ratio >= 200:
                             skip_record = {
-                                **{k: v for k, v in r.items() if k not in ("image", "images")},
-                                "skip_reason": "aspect_ratio_exceeded",
-                                "aspect_ratio": aspect_ratio,
+                                "id": r.get("id"),
+                                "reason": "aspect_ratio_exceeds_200",
+                                "image_shape": [width, height],
+                                "abs_ratio": abs_ratio,
                                 "prompt_name": args.prompt_name,
                             }
-                            fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
-                            fskip.flush()
-                            # 本条记录跳过
-                            # 撤销此前 append 的 prompt
+                            # 尽量记录来源图片路径
+                            if "image_path" in r:
+                                skip_record["image_path"] = r.get("image_path")
+                            print(f"⏭️ 跳过一条样本 (id={skip_record['id']}), aspect ratio={abs_ratio:.2f}")
+                            skip_fout.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
+                            skip_fout.flush()
+                            # 同时移除刚加入的 prompt
                             prompts.pop()
-                            # 不把该图加入 images/valid_records
-                            # 若此前追加了 image_paths，也撤销
-                            if image_paths and ("image_path" in r):
-                                # 仅在通过路径分支追加过时回退一次
-                                image_paths.pop()
                             continue
                     except Exception as e:
-                        print(f"⚠️ 计算宽高比失败，跳过该图片: {e}")
+                        # 无法计算尺寸时也跳过，避免后续处理报错
                         skip_record = {
-                            **{k: v for k, v in r.items() if k not in ("image", "images")},
-                            "skip_reason": "aspect_ratio_check_failed",
+                            "id": r.get("id"),
+                            "reason": f"aspect_ratio_check_failed: {e}",
                             "prompt_name": args.prompt_name,
                         }
-                        fskip.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
-                        fskip.flush()
+                        if "image_path" in r:
+                            skip_record["image_path"] = r.get("image_path")
+                        print(f"⏭️ 跳过一条样本（无法检查尺寸）: {e}")
+                        skip_fout.write(json.dumps(skip_record, ensure_ascii=False) + "\n")
+                        skip_fout.flush()
                         prompts.pop()
                         continue
+
+                    # 记录用于 HF 输入的图片路径（如果已有记录里携带路径则优先使用）
+                    if "image_path" in r:
+                        img_path = Path(r["image_path"]) if isinstance(r["image_path"], str) else None
+                    image_paths.append(img_path if 'img_path' in locals() else None)
                 images.append(img)
                 valid_records.append(r)
             except Exception as e:

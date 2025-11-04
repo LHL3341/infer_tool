@@ -129,12 +129,6 @@ echo "🔪 每个任务分配约 $PER_PART 条样本"
 
 # ========== 启动任务 ==========
 echo "🚀 启动推理任务..."
-# 检测节点 GPU 数用于绑定
-GPUS_ON_NODE=${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L 2>/dev/null | wc -l)}
-if [[ -z "$GPUS_ON_NODE" || "$GPUS_ON_NODE" -eq 0 ]]; then
-  GPUS_ON_NODE=1
-fi
-echo "🧩 节点可用 GPU 数: $GPUS_ON_NODE"
 
 for ((i=0; i<PARTS; i++)); do
   START_IDX=$(( i * PER_PART ))
@@ -151,8 +145,6 @@ for ((i=0; i<PARTS; i++)); do
 
   echo "▶️ 启动任务 part_$i: [$START_IDX, $END_IDX)"
   echo "   日志: $LOG_FILE"
-  GPU_INDEX=$(( i % GPUS_ON_NODE ))
-  echo "   绑定到 GPU: $GPU_INDEX"
 
   CMD="python main.py \
       --model_path $MODEL_PATH \
@@ -177,14 +169,13 @@ for ((i=0; i<PARTS; i++)); do
 
   # srun -p "$PARTITION" --gres=gpu:${GPUS} --quotatype=$QUOTA_TYPE bash -c "$CMD" > "$LOG_FILE" 2>&1 &
   srun -p "$PARTITION" \
+     -N 1 \
      --ntasks=1 \
      --cpus-per-task=4 \
      --gres=gpu:${GPUS} \
-     --gpus-per-task=${GPUS} \
-     --gpu-bind=map_gpu:${GPU_INDEX} \
      --quotatype=$QUOTA_TYPE \
      --exclusive \
-     bash -c "CUDA_VISIBLE_DEVICES=${GPU_INDEX} $CMD" > "$LOG_FILE" 2>&1 &
+     bash -c "$CMD" > "$LOG_FILE" 2>&1 &
 done
 
 echo "⏳ 所有任务已提交，等待完成..."

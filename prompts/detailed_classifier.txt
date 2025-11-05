@@ -1,0 +1,54 @@
+Instruction:
+ You are an expert in multimodal science question analysis.
+ Given a science question and its subject, your task is to determine what type of image (diagram/graph/illustration) would typically accompany or best represent this question.
+ You must classify it into one of the predefined image types based on the subject and visual features listed below.
+Image Type Reference Table
+Physics
+Diagram — free-body diagram, torque diagram, circuit diagram (arrows, axes, symbols)
+Graph / Plot — velocity-time graph, potential energy curve (lines, axes, scales)
+Vector Field — electric field lines, magnetic field lines (directional arrows)
+Apparatus Illustration — experimental setup diagrams
+Waveform — sound wave, electromagnetic wave, simple harmonic motion (sine curve)
+Optical Ray Diagram — reflection, refraction, imaging (rays, lenses)
+Astronomical Diagram — planetary orbit, gravitational field (spheres, trajectories)
+Mathematics
+Geometric Diagram — triangles, circles, polygons, solids (points, lines, angles)
+Coordinate Plot — function graph, analytic geometry (axes, curves, intersections)
+Graph Network — graph theory problems (nodes, edges, weights)
+Combinatorial Layout — arrangements, tree diagrams (branches, arrows)
+Probability Diagram — Venn diagrams, sample spaces (circles, overlaps)
+Number Line — inequalities, intervals (lines, points, arrows)
+Table / Grid — matrices, logic tables, coordinate tables (cells, numbers)
+Chemistry
+Molecular Structure — alkane structures, benzene rings (chemical bonds, element symbols)
+Reaction Scheme — acid-base reactions, organic synthesis (reaction arrows, reagents, products)
+Apparatus Diagram — titration, distillation, filtration setups (flasks, tubes, labels)
+Energy Profile — reaction energy curves (energy axis, reaction progress, curve)
+Phase Diagram — pressure-temperature plots (regions, boundaries)
+Electron Configuration — atomic orbital diagrams (shells, electrons, levels)
+Periodic Trend Graph — trends across the periodic table (line or bar charts)
+Biology
+Cell Diagram — structure of plant/animal cells (membrane, nucleus, labels)
+Molecular Process Diagram — DNA replication, transcription, translation (chains, enzymes, arrows)
+System Anatomy Diagram — organ systems (organs, tubes, arrows)
+Ecological Diagram — food chains, ecosystem cycles (arrows, species icons)
+Genetic Cross Chart — Punnett square (grid, gene symbols)
+Microscope Image — tissue sections, chromosomes (cell morphology, texture)
+Graphical Data — growth curves, population changes (line graph, axes, annotations)
+Your output format:
+  "Optical Ray Diagram / Graph / etc"
+Example 1:
+Question: “A ray of light passes from air into glass at an angle of incidence of 30°. Draw a diagram showing the path of the ray and label the angle of refraction.”
+Subject: "Physics"
+Output: "Optical Ray Diagram"
+Example 2:
+Question: “Find the area enclosed by the parabola ( y = x^2 ) and the line ( y = 4 ).”
+Subject: "Mathematics"
+Output: "Coordinate Plot"
+
+Now your task:
+ Determine the most appropriate image type for the following question.
+Question:
+ {question}
+Subject:
+ {category}

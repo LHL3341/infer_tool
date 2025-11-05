@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH -J qwen3_detailed_classifier
+#SBATCH -p belt_road
+#SBATCH --gres=gpu:8
+#SBATCH -N 1
+#SBATCH --ntasks=8
+#SBATCH --cpus-per-task=4
+#SBATCH -o /mnt/petrelfs/qinchonghan/project/infer_tool/logs/qwen3_detailed_classifier_%j.out
+#SBATCH -e /mnt/petrelfs/qinchonghan/project/infer_tool/logs/qwen3_detailed_classifier_%j.err
+#SBATCH -t 7-00:00:00
+
+set -euo pipefail
+
+cd /mnt/petrelfs/qinchonghan/project/infer_tool
+
+source activate llamafactory
+
+bash /mnt/petrelfs/qinchonghan/project/infer_tool/run_qwen3_batch_detailed_classifier.sh

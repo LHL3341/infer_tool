@@ -189,4 +189,13 @@ echo "🧩 开始合并结果到: $MERGED_FILE"
 find "$OUTPUT_DIR" -maxdepth 1 -type f -name "part_*.jsonl" \
   | sort | xargs cat > "$MERGED_FILE"
 
+# ========== 合并跳过样本 ==========
+SKIPPED_FILE="${OUTPUT_DIR}/skipped.jsonl"
+echo "🧩 开始合并跳过样本到: $SKIPPED_FILE"
+
+find "$OUTPUT_DIR" -maxdepth 1 -type f -name "skipped_part_*.jsonl" \
+  | sort | xargs cat > "$SKIPPED_FILE"
+
+echo "🗂️ 跳过样本合并完成: $SKIPPED_FILE"
+
 echo "🎉 全部完成！最终输出文件: $MERGED_FILE"

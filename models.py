@@ -62,6 +62,18 @@ def intern_vl_prompt(prompt):
     # print(text)
     return text
 
+def internvl_35_prompt(prompt):
+    tokenizer = AutoTokenizer.from_pretrained("OpenGVLab/InternVL3_5-8B", trust_remote_code=True, padding_side="left")
+    if '<image>' in prompt:
+        prompt = prompt.replace('<image>', '')
+    messages = [{"role": "user", "content": prompt.replace("{<|image_pad|>}", "<image>\n")}]
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    return text
+
 MODEL_CLASS = {
     "qwen2_5vl": Qwen2_5_VLForConditionalGeneration,
     "qwen3vl_nothink": Qwen3VLForConditionalGeneration,
@@ -74,6 +86,7 @@ PROMPT_CLASS = {
     "qwen3_think": qwen3_think_prompt,
     "qwen3vl_nothink": qwen3_vl_nothink_prompt,
     "intern_vl": intern_vl_prompt,
+    "intern_vl_35": internvl_35_prompt,
 }
 
 def get_model(model_name):
